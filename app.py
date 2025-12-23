@@ -1,7 +1,3 @@
-# app.py
-# Requirements (example):
-# pip install streamlit ultralytics opencv-python streamlit-webrtc av pillow numpy
-
 import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
@@ -20,7 +16,7 @@ st.title("Pill Detection & Counting (YOLOv8)")
 MODEL_PATH = "best.pt"
 
 if not os.path.exists(MODEL_PATH):
-    st.warning("Model belum tersedia. Upload best.pt ke folder proyek atau jalankan training terlebih dahulu.")
+    st.warning("Model tidak ditemukan.")
     st.stop()
 
 # load model once
@@ -28,18 +24,12 @@ model = YOLO(MODEL_PATH)
 
 # Sidebar controls
 st.sidebar.header("Settings")
-conf = st.sidebar.slider("Confidence threshold", 0.1, 0.9, 0.40, step=0.05)
+conf = st.sidebar.slider("Confidence threshold", 0.1, 0.9, 0.50, step=0.05)
 imgsz = st.sidebar.selectbox("Image size (inference)", [320, 416, 640, 960], index=2)
 show_labels = st.sidebar.checkbox("Show class/conf labels on boxes", value=True)
 
 # helper: draw boxes + count on numpy image (RGB)
 def annotate_frame_rgb(frame_rgb: np.ndarray, results, show_labels=True):
-    """
-    frame_rgb: HxWx3 uint8 RGB
-    results: ultralytics Results object for that frame
-    returns annotated frame in BGR uint8 (ready for opencv VideoWriter or av)
-    """
-    # ensure uint8 and 3-channels
     if frame_rgb.dtype != np.uint8:
         frame_rgb = np.clip(frame_rgb * 255.0, 0, 255).astype(np.uint8)
     if frame_rgb.ndim == 2:
@@ -61,7 +51,7 @@ def annotate_frame_rgb(frame_rgb: np.ndarray, results, show_labels=True):
         if score < conf:
             continue
         count += 1
-        cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), (0, 64, 255), 2)  # orange-red box
+        cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), (0, 64, 255), 2) 
         if show_labels:
             label = f"pill {score:.2f}"
             (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -78,8 +68,7 @@ def annotate_frame_rgb(frame_rgb: np.ndarray, results, show_labels=True):
 # ---------- IMAGE MODE ----------
 def handle_image_upload(uploaded_file):
     img = Image.open(uploaded_file).convert("RGB")
-    img_np = np.array(img)  # RGB uint8
-    # run inference (use model(...) API)
+    img_np = np.array(img) 
     res = model(img_np, imgsz=imgsz, conf=conf)[0]
     annotated_bgr, count = annotate_frame_rgb(img_np, res, show_labels=show_labels)
     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
@@ -135,7 +124,6 @@ def process_uploaded_video(temp_video_path: str):
 # ---------- WEBRTC / WEBCAM MODE ----------
 use_webrtc = True
 try:
-    # (webrtc imports done above globally)
     pass
 except Exception as e:
     use_webrtc = False
@@ -147,24 +135,20 @@ if use_webrtc:
         when the transformer is created (so set conf/imgsz before pressing start).
         """
         def __init__(self):
-            # grab current settings at transformer creation time
             self._model = model
             self._conf = float(conf)
             self._imgsz = int(imgsz)
             self._show_labels = bool(show_labels)
 
         def recv(self, frame):
-            # frame is av.VideoFrame
-            img_bgr = frame.to_ndarray(format="bgr24")  # BGR uint8
+            img_bgr = frame.to_ndarray(format="bgr24")
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             try:
                 res = self._model(img_rgb, imgsz=self._imgsz, conf=self._conf)[0]
             except Exception:
-                # if inference fails just return original frame
                 return av.VideoFrame.from_ndarray(img_bgr, format="bgr24")
 
             annotated_bgr, n = annotate_frame_rgb(img_rgb, res, show_labels=self._show_labels)
-            # return as av frame in bgr24
             return av.VideoFrame.from_ndarray(annotated_bgr, format="bgr24")
 
 else:
@@ -196,7 +180,7 @@ elif mode == "Upload Video":
         tfile.write(uploaded_video.read())
         tfile.flush()
         tfile.close()
-        st.info("Memproses video — ini bisa memakan waktu tergantung durasi dan ukuran video.")
+        st.info("Memproses video...")
         with st.spinner("Processing video (frame-by-frame)..."):
             try:
                 out_path, stats = process_uploaded_video(tfile.name)
@@ -218,16 +202,13 @@ else:  # Webcam
         st.info("Install dengan: pip install streamlit-webrtc av")
     else:
         st.info("Pastikan kamu set Confidence & Image size sebelum menekan tombol Start.")
-        # optional: custom rtc config (for deployed envs with HTTPS you may need STUN/TURN)
         RTC_CONFIGURATION = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
 
-        # IMPORTANT CHANGE: use WebRtcMode.SENDRECV so browser will request camera permission
         webrtc_ctx = webrtc_streamer(
             key="pill-webcam",
-            mode=WebRtcMode.SENDRECV,  # <-- ganti dari RECVONLY ke SENDRECV
+            mode=WebRtcMode.SENDRECV, 
             video_transformer_factory=PillVideoTransformer,
             rtc_configuration=RTC_CONFIGURATION,
-            # request camera from browser. you can set ideal width/height if you want:
             media_stream_constraints={
                 "video": {"facingMode": "user", "width": {"ideal": imgsz}, "height": {"ideal": imgsz}},
                 "audio": False
