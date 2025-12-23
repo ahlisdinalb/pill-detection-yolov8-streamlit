@@ -7,8 +7,8 @@ import os
 import tempfile
 from pathlib import Path
 import shutil
-# from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration, WebRtcMode
-# import av
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration, WebRtcMode
+import av
 
 st.set_page_config(page_title="Pill Detection", layout="wide")
 st.title("Pill Detection & Counting (YOLOv8)")
@@ -128,34 +128,34 @@ try:
 except Exception as e:
     use_webrtc = False
 
-# if use_webrtc:
-    # class PillVideoTransformer(VideoTransformerBase):
-    #     """
-    #     This transformer runs in a separate thread. We capture the model and settings
-    #     when the transformer is created (so set conf/imgsz before pressing start).
-    #     """
-    #     def __init__(self):
-    #         self._model = model
-    #         self._conf = float(conf)
-    #         self._imgsz = int(imgsz)
-    #         self._show_labels = bool(show_labels)
+if use_webrtc:
+    class PillVideoTransformer(VideoTransformerBase):
+        """
+        This transformer runs in a separate thread. We capture the model and settings
+        when the transformer is created (so set conf/imgsz before pressing start).
+        """
+        def __init__(self):
+            self._model = model
+            self._conf = float(conf)
+            self._imgsz = int(imgsz)
+            self._show_labels = bool(show_labels)
 
-    #     def recv(self, frame):
-    #         img_bgr = frame.to_ndarray(format="bgr24")
-    #         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    #         try:
-    #             res = self._model(img_rgb, imgsz=self._imgsz, conf=self._conf)[0]
-    #         except Exception:
-    #             return av.VideoFrame.from_ndarray(img_bgr, format="bgr24")
+        def recv(self, frame):
+            img_bgr = frame.to_ndarray(format="bgr24")
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            try:
+                res = self._model(img_rgb, imgsz=self._imgsz, conf=self._conf)[0]
+            except Exception:
+                return av.VideoFrame.from_ndarray(img_bgr, format="bgr24")
 
-    #         annotated_bgr, n = annotate_frame_rgb(img_rgb, res, show_labels=self._show_labels)
-    #         return av.VideoFrame.from_ndarray(annotated_bgr, format="bgr24")
+            annotated_bgr, n = annotate_frame_rgb(img_rgb, res, show_labels=self._show_labels)
+            return av.VideoFrame.from_ndarray(annotated_bgr, format="bgr24")
 
-# else:
-#     PillVideoTransformer = None
+else:
+    PillVideoTransformer = None
 
 # ---------- FRONTEND UI ----------
-mode = st.radio("Pilih Mode", ["Upload Image", "Upload Video", "Webcam (Disable)"])
+mode = st.radio("Pilih Mode", ["Upload Image", "Upload Video", "Webcam (Realtime)"])
 
 if mode == "Upload Image":
     uploaded_image = st.file_uploader("Upload gambar (jpg/png/jpeg)", type=["jpg", "jpeg", "png"])
